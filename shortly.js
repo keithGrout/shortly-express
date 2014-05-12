@@ -8,6 +8,7 @@ var User = require('./app/models/user');
 var Links = require('./app/collections/links');
 var Link = require('./app/models/link');
 var Click = require('./app/models/click');
+var bcrypt = require('bcrypt-nodejs');
 
 var app = express();
 
@@ -20,7 +21,10 @@ app.configure(function() {
 });
 
 app.get('/', function(req, res) {
-  res.render('index');
+   //check if session exists
+    // res.render(index)
+    // no redirect to login
+  res.render('login');
 });
 
 app.get('/create', function(req, res) {
@@ -70,6 +74,47 @@ app.post('/links', function(req, res) {
 // Write your authentication routes here
 /************************************************************/
 
+app.post('/login', function(req, res) {
+  // get username and password from browser
+  var username = req.body.username;
+  var password = req.body.password;
+  // create hash from username and pw
+  var salt = bcrypt.genSaltSync(10);
+  var hash = bcrypt.hashSync(password, salt);
+  new User ({username: username, password: hash}).fetch().then(function(found) {
+    if (found) {
+      //create session
+      //redirect to index
+    } else {
+      // incorrect user or password message
+    }
+
+  });
+
+});
+
+app.get('/signup', function(req, res) {
+  res.render('signup');
+});
+
+app.post('/signup', function(req, res) {
+  var username = req.body.username;
+  var password = req.body.password;
+  // create hash from username and pw
+  var salt = bcrypt.genSaltSync(10);
+  var hash = bcrypt.hashSync(password, salt);
+  new User({username: username}).fetch().then(function(found){
+    if (found) {
+      console.log('found already');
+    } else {
+      new User({username: username, password: hash}).save().then(function(user){
+        console.log('didnt find, saved new user');
+      // create session
+      // render(index)
+      });
+    }
+  });
+});
 
 
 /************************************************************/
@@ -98,6 +143,10 @@ app.get('/*', function(req, res) {
       });
     }
   });
+});
+
+Users.fetch().then(function(found){
+  console.log(found.models);
 });
 
 console.log('Shortly is listening on 4568');
