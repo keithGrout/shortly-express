@@ -18,20 +18,31 @@ app.configure(function() {
   app.use(partials());
   app.use(express.bodyParser())
   app.use(express.static(__dirname + '/public'));
+  app.use(express.cookieParser('secretsarefun'));
+  app.use(express.session());
 });
 
-app.get('/', function(req, res) {
+function restrict(req, res, next) {
+  if (req.session.user) {
+    next();
+  } else {
+    req.session.error = 'Access denied!';
+    res.redirect('/login');
+  }
+}
+
+app.get('/', restrict, function(req, res) {
    //check if session exists
     // res.render(index)
     // no redirect to login
-  res.render('login');
-});
-
-app.get('/create', function(req, res) {
   res.render('index');
 });
 
-app.get('/links', function(req, res) {
+app.get('/create', restrict, function(req, res) {
+  res.render('index');
+});
+
+app.get('/links', restrict, function(req, res) {
   Links.reset().fetch().then(function(links) {
     res.send(200, links.models);
   })
@@ -74,27 +85,46 @@ app.post('/links', function(req, res) {
 // Write your authentication routes here
 /************************************************************/
 
+
 app.post('/login', function(req, res) {
   // get username and password from browser
   var username = req.body.username;
   var password = req.body.password;
   // create hash from username and pw
-  var salt = bcrypt.genSaltSync(10);
-  var hash = bcrypt.hashSync(password, salt);
-  new User ({username: username, password: hash}).fetch().then(function(found) {
+  new User ({username: username}).fetch().then(function(found) {
     if (found) {
-      //create session
-      //redirect to index
+      var salt = found.attributes.password.slice(0, 29);
+      var rehashed = bcrypt.hashSync(password, salt);
+
+      if (rehashed === found.attributes.password) {
+        req.session.regenerate(function(){
+          req.session.user = username;
+          console.log(req.session);
+          res.redirect('/');
+        });
+      } else {
+        console.log('login didnt work');
+        res.redirect('/login');
+      }
     } else {
-      // incorrect user or password message
+      console.log('login didnt work');
+      res.redirect('/login');
     }
-
   });
+});
 
+app.get('/logout', function(req, res){
+  req.session.destroy(function(){
+    res.redirect('/');
+  });
 });
 
 app.get('/signup', function(req, res) {
   res.render('signup');
+});
+
+app.get('/login', function(req, res) {
+  res.render('login');
 });
 
 app.post('/signup', function(req, res) {
@@ -109,6 +139,7 @@ app.post('/signup', function(req, res) {
     } else {
       new User({username: username, password: hash}).save().then(function(user){
         console.log('didnt find, saved new user');
+        console.log(hash);
       // create session
       // render(index)
       });
@@ -143,10 +174,6 @@ app.get('/*', function(req, res) {
       });
     }
   });
-});
-
-Users.fetch().then(function(found){
-  console.log(found.models);
 });
 
 console.log('Shortly is listening on 4568');
